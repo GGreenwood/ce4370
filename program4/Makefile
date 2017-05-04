@@ -1,4 +1,4 @@
 PROJECT=program4
 
 $(PROJECT): $(PROJECT).c
-	gcc -o $(PROJECT) $(PROJECT).c -I.
+	g++ -std=c++11 -o $(PROJECT) $(PROJECT).c -I.

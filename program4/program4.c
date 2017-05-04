@@ -6,12 +6,13 @@
 
 #define NUM_TASKS   5
 
-#define MIN_PERIOD  100
+#define MIN_PERIOD  200
 #define MAX_PERIOD  2000
 
+#define MIN_LENGTH  50
 #define MAX_LENGTH_RATIO    .5
 
-#define MAX_UTILIZATION     .999
+#define MAX_UTILIZATION     .99
 
 typedef struct {
     int id;
@@ -97,9 +98,9 @@ int cmp_task_next(const void *a, const void *b) {
     // If both tasks are ready and critical, continue
     // Next, sort by inverse laxity(dynamic priority)
     if(task1->laxity < task2->laxity) {
-        return 1;
-    } else if(task1->laxity > task2->laxity) {
         return -1;
+    } else if(task1->laxity > task2->laxity) {
+        return 1;
     } else {
         return 0;
     }
@@ -108,53 +109,61 @@ int cmp_task_next(const void *a, const void *b) {
     return 0;
 }
 
-void update_task(Task task, int cur_time) {
-    if(task.deadline <= cur_time + task.length) {
-        if(task.is_ready) {
+void update_task(Task *task, int cur_time) {
+    if(task->deadline <= cur_time + task->length) {
+        if(task->is_ready) {
             // Deadline is reached, and task has not been executed
-            printf("Task %i deadline missed. Increasing deadline by one period.\n");
-            task.deadline += task.period;
+            printf("Task %i deadline missed. Increasing deadline by one period.\n", task->id);
+            task->deadline += task->period;
             return;
         } else {
             // Deadline is reached, and task has been executed
-            task.deadline += task.period;
-            task.is_ready = true;
+            task->deadline += task->period;
+            task->is_ready = true;
             return;
         }
     }
 
     // Update laxity
-    task.laxity = task.deadline - cur_time - task.length;
+    task->laxity = task->deadline - cur_time - task->length;
+    //printf("%i\n", task->laxity);
 }
 
-void execute_task(Task task) {
-    printf("Executing task %i...\n", task.id);
-    task.is_ready = false;
-    msleep(task.length);
+void execute_task(Task *task) {
+    printf("Executing task %i...\n", task->id);
+    task->is_ready = false;
+    msleep(task->length);
 }
 
-void print_task(Task task) {
-    printf("### Task %i ###\n", task.id);
-    printf("Period: \t%4i\n", task.period);
-    printf("Length: \t%4i\n", task.length);
+void print_task(Task *task, bool verbose) {
+    printf("### Task %i ###\n", task->id);
+    printf("Period: \t%4i\n", task->period);
+    printf("Length: \t%4i\n", task->length);
+
+    if(verbose) {
+        printf("Deadline: \t%12i\n", task->deadline);
+        printf("Laxity:   \t%12i\n", task->laxity);
+        printf("Is critical: \t%5s\n", task->is_critical ? "true" : "false");
+        printf("Is ready:    \t%5s\n", task->is_ready ? "true" : "false");
+    }
 
     printf("\n");
 }
-
 
 int main(int argc, char **argv) {
     srand(time(NULL));
 
     Task tasks[NUM_TASKS];
 
-    // Generate NUM_TASKS tasks
+    // Generate some tasks randomly
     printf("GENERATING RANDOM TASKS...\n");
     for(int i = 0; i < NUM_TASKS; i++) {
         tasks[i].id = i;
         tasks[i].period = randint(MIN_PERIOD, MAX_PERIOD);
-        tasks[i].length = randint(1, tasks[i].period * MAX_LENGTH_RATIO);
+        tasks[i].length = randint(MIN_LENGTH, tasks[i].period * MAX_LENGTH_RATIO);
+        tasks[i].deadline = tasks[i].period;
 
-        print_task(tasks[i]);
+        print_task(&tasks[i], false);
     }
 
     // Sort tasks by period
@@ -179,20 +188,23 @@ int main(int argc, char **argv) {
             printf("Task %i is not critical\n", tasks[i].id);
         }
     }
-    printf("Total utilization is %f\n\n", total_utilization);
+    printf("Total critical utilization is %f\n\n", total_utilization);
 
     // Enter execution loop
     printf("ENTERING EXECUTION LOOP...\n");
-
-    // Find next task to run
-    while(true) {
+    for(;;) {
         int cur_time = get_time();
+        // Update each tasks state
         for(int i = 0; i < NUM_TASKS; i++) {
-            print_task(tasks[i]);
-            update_task(tasks[i], cur_time);
+            update_task(&tasks[i], cur_time);
         }
+        // Find next task to run
         qsort(tasks, NUM_TASKS, sizeof(Task), cmp_task_next);
-        execute_task(tasks[0]);
+
+        for(int i = 0; i < NUM_TASKS; i++) {
+            //print_task(&tasks[i], true);
+        }
+        execute_task(&tasks[0]);
     }
 
     return 0;
